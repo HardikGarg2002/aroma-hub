@@ -27,7 +27,7 @@ function toValues(c: AdminCollection | null, products: AdminProduct[]): Collecti
     description: c?.description ?? "",
     image_url: c?.image_url ?? "",
     is_active: String(c?.is_active ?? true),
-    product_ids: c ? products.filter((p) => p.collection === c.name).map((p) => p.id) : [],
+    product_ids: c ? products.filter((p) => p.collection_ids.includes(c.id)).map((p) => p.id) : [],
   };
 }
 
@@ -199,7 +199,7 @@ function ProductMembers({
           />
           <ul className="mt-3 max-h-72 divide-y divide-line overflow-y-auto rounded-md border border-line bg-paper">
             {candidates.map((p) => {
-              const elsewhere = p.collection && p.collection !== collectionName ? p.collection : null;
+              const elsewhere = p.collection_names.filter((n) => n !== collectionName);
               return (
                 <li key={p.id} className="flex items-center gap-3 px-3 py-2">
                   <ProductThumb src={p.image_url} alt={p.name} size={36} />
@@ -207,7 +207,7 @@ function ProductMembers({
                     <p className="truncate text-sm font-medium">{p.name}</p>
                     <p className="truncate text-xs text-muted">
                       <span className="font-mono">{p.product_code}</span>
-                      {elsewhere && <> · Currently in {elsewhere} (will move)</>}
+                      {elsewhere.length > 0 && <> · Also in {elsewhere.join(", ")}</>}
                     </p>
                   </div>
                   <button

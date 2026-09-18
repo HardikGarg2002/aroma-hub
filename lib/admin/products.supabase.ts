@@ -2,7 +2,6 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AdminProduct, AdminProductInput } from "@/types/admin";
-import type { Database } from "@/types/database";
 
 /**
  * Supabase-backed product store. Mirrors the function signatures in
@@ -10,16 +9,36 @@ import type { Database } from "@/types/database";
  */
 
 const TABLE = "products";
+const JOIN = "product_collections";
 
-/** Single literal, not a concatenation: the SDK statically parses this string. */
+/**
+ * Single literal, not a concatenation: the SDK statically parses this string.
+ * The trailing embed pulls each product's collections through the join table
+ * in the same round trip, so listing products stays one query.
+ */
 const COLUMNS =
-  "id, product_code, name, inspired_by, description, price, currency, size_options, collection, image_url, is_active, created_at, updated_at" as const;
+  "id, product_code, name, inspired_by, description, price, currency, size_options, image_url, is_active, created_at, updated_at, product_collections(collections(id, name))" as const;
 
-/** postgres `numeric` arrives as a string over PostgREST; AdminProduct wants a number. */
-type Row = Database["public"]["Tables"]["products"]["Row"];
+/** A row as selected by COLUMNS, before the embed is flattened. */
+type Row = Omit<AdminProduct, "price" | "collection_ids" | "collection_names"> & {
+  price: number | string;
+  product_collections: { collections: { id: string; name: string } | null }[] | null;
+};
 
 function toProduct(row: Row): AdminProduct {
-  return { ...row, price: Number(row.price), size_options: row.size_options ?? [] };
+  const { product_collections, ...rest } = row;
+  const collections = (product_collections ?? [])
+    .map((m) => m.collections)
+    .filter((c): c is { id: string; name: string } => c !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    ...rest,
+    price: Number(row.price),
+    size_options: row.size_options ?? [],
+    collection_ids: collections.map((c) => c.id),
+    collection_names: collections.map((c) => c.name),
+  };
 }
 
 export async function listProducts(): Promise<AdminProduct[]> {
@@ -29,7 +48,7 @@ export async function listProducts(): Promise<AdminProduct[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list products: ${error.message}`);
-  return data.map(toProduct);
+  return (data as unknown as Row[]).map(toProduct);
 }
 
 export async function getProduct(id: string): Promise<AdminProduct | null> {
@@ -40,7 +59,7 @@ export async function getProduct(id: string): Promise<AdminProduct | null> {
     .maybeSingle();
 
   if (error) throw new Error(`Failed to load product: ${error.message}`);
-  return data ? toProduct(data) : null;
+  return data ? toProduct(data as unknown as Row) : null;
 }
 
 export async function isProductCodeTaken(code: string, exceptId?: string) {
@@ -56,30 +75,87 @@ export async function isProductCodeTaken(code: string, exceptId?: string) {
   return (count ?? 0) > 0;
 }
 
+/**
+ * Make `ids` exactly the rows matching `keep` in the join table: rows outside
+ * the list are deleted, listed ones inserted if missing. Shared by the two
+ * directions of membership editing below.
+ */
+async function syncMemberships(
+  keep: { column: "product_id" | "collection_id"; value: string },
+  otherColumn: "product_id" | "collection_id",
+  ids: string[],
+  failure: string,
+) {
+  const db = supabaseAdmin();
+
+  let remove = db.from(JOIN).delete().eq(keep.column, keep.value);
+  if (ids.length) remove = remove.not(otherColumn, "in", `(${ids.join(",")})`);
+
+  const { error: removeError } = await remove;
+  if (removeError) throw new Error(`${failure}: ${removeError.message}`);
+
+  if (!ids.length) return;
+
+  const rows = ids.map((id) =>
+    keep.column === "product_id"
+      ? { product_id: keep.value, collection_id: id }
+      : { product_id: id, collection_id: keep.value },
+  );
+
+  const { error: addError } = await db
+    .from(JOIN)
+    .upsert(rows, { onConflict: "product_id,collection_id", ignoreDuplicates: true });
+
+  if (addError) throw new Error(`${failure}: ${addError.message}`);
+}
+
 export async function createProduct(input: AdminProductInput): Promise<AdminProduct> {
+  const { collection_ids, ...columns } = input;
+
   const { data, error } = await supabaseAdmin()
     .from(TABLE)
-    .insert(input)
-    .select(COLUMNS)
+    .insert(columns)
+    .select("id")
     .single();
 
   if (error) throw new Error(`Failed to create product: ${error.message}`);
-  return toProduct(data);
+
+  await syncMemberships(
+    { column: "product_id", value: data.id },
+    "collection_id",
+    collection_ids,
+    "Failed to set product collections",
+  );
+
+  const created = await getProduct(data.id);
+  if (!created) throw new Error("Product vanished immediately after creation");
+  return created;
 }
 
 export async function updateProduct(
   id: string,
   input: AdminProductInput,
 ): Promise<AdminProduct | null> {
+  const { collection_ids, ...columns } = input;
+
   const { data, error } = await supabaseAdmin()
     .from(TABLE)
-    .update(input)
+    .update(columns)
     .eq("id", id)
-    .select(COLUMNS)
+    .select("id")
     .maybeSingle();
 
   if (error) throw new Error(`Failed to update product: ${error.message}`);
-  return data ? toProduct(data) : null;
+  if (!data) return null;
+
+  await syncMemberships(
+    { column: "product_id", value: id },
+    "collection_id",
+    collection_ids,
+    "Failed to set product collections",
+  );
+
+  return getProduct(id);
 }
 
 export async function setProductActive(
@@ -90,43 +166,23 @@ export async function setProductActive(
     .from(TABLE)
     .update({ is_active: isActive })
     .eq("id", id)
-    .select(COLUMNS)
+    .select("id")
     .maybeSingle();
 
   if (error) throw new Error(`Failed to update product: ${error.message}`);
-  return data ? toProduct(data) : null;
+  return data ? getProduct(id) : null;
 }
 
 /**
- * Make `productIds` exactly the members of a collection: listed products move
- * in from wherever they were, and products left in `previousName`/`name` are
- * cleared. Two statements rather than a row-by-row loop.
+ * Make `productIds` exactly the members of `collectionId`. Products dropped
+ * from the list keep whatever other collections they are in -- membership is
+ * many-to-many now, so this only touches rows for this collection.
  */
-export async function setCollectionMembers(
-  previousName: string | null,
-  name: string,
-  productIds: string[],
-) {
-  const db = supabaseAdmin();
-  const names = previousName && previousName !== name ? [previousName, name] : [name];
-
-  // Clear everyone currently in the collection who isn't in the new list.
-  let clear = db.from(TABLE).update({ collection: null }).in("collection", names);
-  if (productIds.length) clear = clear.not("id", "in", `(${productIds.join(",")})`);
-
-  const { error: clearError } = await clear;
-  if (clearError) {
-    throw new Error(`Failed to update collection members: ${clearError.message}`);
-  }
-
-  if (!productIds.length) return;
-
-  const { error: assignError } = await db
-    .from(TABLE)
-    .update({ collection: name })
-    .in("id", productIds);
-
-  if (assignError) {
-    throw new Error(`Failed to update collection members: ${assignError.message}`);
-  }
+export async function setCollectionMembers(collectionId: string, productIds: string[]) {
+  await syncMemberships(
+    { column: "collection_id", value: collectionId },
+    "product_id",
+    productIds,
+    "Failed to update collection members",
+  );
 }

@@ -1,4 +1,5 @@
 import { PRODUCT_IMAGES } from "@/lib/images";
+import { COLLECTION_SEED_NAMES, collectionSeedId, peekCollections } from "./collections.mock";
 import type { AdminProduct, AdminProductInput } from "@/types/admin";
 
 /**
@@ -33,7 +34,11 @@ const SEEDS: Seed[] = [
 function seed(): AdminProduct[] {
   const base = Date.parse("2026-06-01T10:00:00Z");
   const day = 86_400_000;
-  return SEEDS.map(([code, name, inspiredBy, collection, price, image, active = true], i) => ({
+  return SEEDS.map(([code, name, inspiredBy, collection, price, image, active = true], i) => {
+    // Seed products start in the one collection named above; the id has to
+    // match the collection store's deterministic seed ids.
+    const ids = COLLECTION_SEED_NAMES.includes(collection) ? [collectionSeedId(collection)] : [];
+    return {
     id: `8f3c1a2e-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     product_code: code,
     name,
@@ -42,12 +47,14 @@ function seed(): AdminProduct[] {
     price,
     currency: "CAD",
     size_options: i % 3 === 0 ? ["10 ml", "50 ml", "100 ml"] : ["30 ml", "50 ml"],
-    collection,
+    collection_ids: ids,
+    collection_names: ids.length ? [collection] : [],
     image_url: image,
     is_active: active,
     created_at: new Date(base + i * day).toISOString(),
     updated_at: new Date(base + i * day * 3).toISOString(),
-  }));
+    };
+  });
 }
 
 const store = globalThis as typeof globalThis & { __aromaAdminProducts?: AdminProduct[] };
@@ -69,7 +76,13 @@ export async function isProductCodeTaken(code: string, exceptId?: string) {
 
 export async function createProduct(input: AdminProductInput): Promise<AdminProduct> {
   const now = new Date().toISOString();
-  const product: AdminProduct = { ...input, id: crypto.randomUUID(), created_at: now, updated_at: now };
+  const product: AdminProduct = {
+    ...input,
+    collection_names: namesFor(input.collection_ids),
+    id: crypto.randomUUID(),
+    created_at: now,
+    updated_at: now,
+  };
   products().push(product);
   return product;
 }
@@ -78,7 +91,12 @@ export async function updateProduct(id: string, input: AdminProductInput): Promi
   const list = products();
   const i = list.findIndex((p) => p.id === id);
   if (i === -1) return null;
-  list[i] = { ...list[i], ...input, updated_at: new Date().toISOString() };
+  list[i] = {
+    ...list[i],
+    ...input,
+    collection_names: namesFor(input.collection_ids),
+    updated_at: new Date().toISOString(),
+  };
   return list[i];
 }
 
@@ -89,20 +107,28 @@ export async function setProductActive(id: string, isActive: boolean): Promise<A
   return product;
 }
 
+/** Resolve collection ids to names for display, dropping any that vanished. */
+function namesFor(ids: string[]): string[] {
+  const byId = new Map(peekCollections().map((c) => [c.id, c.name]));
+  return ids.map((id) => byId.get(id)).filter((n): n is string => n !== undefined);
+}
+
 /**
- * Make `productIds` exactly the members of a collection. Products currently in
- * `previousName` but not listed are removed; listed products move in from
- * wherever they were. Also handles renames, since every member is rewritten.
+ * Make `productIds` exactly the members of `collectionId`. Products dropped
+ * from the list keep their other collections -- membership is many-to-many.
  */
-export async function setCollectionMembers(previousName: string | null, name: string, productIds: string[]) {
-  const ids = new Set(productIds);
+export async function setCollectionMembers(collectionId: string, productIds: string[]) {
+  const wanted = new Set(productIds);
   const now = new Date().toISOString();
+
   for (const p of products()) {
-    const inCollection = p.collection !== null && (p.collection === previousName || p.collection === name);
-    if (ids.has(p.id)) {
-      if (p.collection !== name) Object.assign(p, { collection: name, updated_at: now });
-    } else if (inCollection) {
-      Object.assign(p, { collection: null, updated_at: now });
-    }
+    const has = p.collection_ids.includes(collectionId);
+    if (wanted.has(p.id) === has) continue;
+
+    const ids = wanted.has(p.id)
+      ? [...p.collection_ids, collectionId]
+      : p.collection_ids.filter((id) => id !== collectionId);
+
+    Object.assign(p, { collection_ids: ids, collection_names: namesFor(ids), updated_at: now });
   }
 }

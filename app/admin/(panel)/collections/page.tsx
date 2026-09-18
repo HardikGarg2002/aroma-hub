@@ -15,9 +15,11 @@ export default async function AdminCollectionsPage() {
   await requireAdmin();
   const [collections, products] = await Promise.all([listCollections(), listProducts()]);
 
+  // Products can be in several collections, so one product may count once
+  // toward each of them.
   const counts = new Map<string, number>();
   for (const p of products) {
-    if (p.collection) counts.set(p.collection, (counts.get(p.collection) ?? 0) + 1);
+    for (const id of p.collection_ids) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
   return (
@@ -64,7 +66,7 @@ export default async function AdminCollectionsPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3 font-mono text-xs text-ink-soft">{c.slug}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{counts.get(c.name) ?? 0}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{counts.get(c.id) ?? 0}</td>
                 <td className="px-4 py-3">
                   <StatusToggle
                     id={c.id}

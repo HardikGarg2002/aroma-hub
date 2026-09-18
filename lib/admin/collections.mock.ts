@@ -26,6 +26,15 @@ export function slugify(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+/** Seed collection names, in seed order -- products.mock.ts maps names to ids. */
+export const COLLECTION_SEED_NAMES: string[] = SEEDS.map(([name]) => name);
+
+/** The deterministic id a seed collection gets, by name. */
+export function collectionSeedId(name: string): string {
+  const i = COLLECTION_SEED_NAMES.indexOf(name);
+  return `c011ec70-0000-4000-8000-${String(i + 1).padStart(12, "0")}`;
+}
+
 function seed(): AdminCollection[] {
   const base = Date.parse("2026-05-20T10:00:00Z");
   const day = 86_400_000;
@@ -43,6 +52,9 @@ function seed(): AdminCollection[] {
 
 const store = globalThis as typeof globalThis & { __aromaAdminCollections?: AdminCollection[] };
 const collections = () => (store.__aromaAdminCollections ??= seed());
+
+/** Synchronous read for products.mock.ts, which maps membership ids to names. */
+export const peekCollections = (): readonly AdminCollection[] => collections();
 
 export async function listCollections(): Promise<AdminCollection[]> {
   return [...collections()].sort((a, b) => a.name.localeCompare(b.name));

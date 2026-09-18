@@ -62,7 +62,9 @@ export default async function AdminProductsPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3 font-mono text-xs text-ink-soft">{p.product_code}</td>
-                <td className="px-4 py-3 text-ink-soft">{p.collection ?? "—"}</td>
+                <td className="px-4 py-3 text-ink-soft">
+                  {p.collection_names.length ? p.collection_names.join(", ") : "—"}
+                </td>
                 <td className="px-4 py-3 text-ink-soft">{p.size_options.join(", ")}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatMoney(p.price, p.currency)}</td>
                 <td className="px-4 py-3">

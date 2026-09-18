@@ -49,7 +49,7 @@ export default async function AdminProductEditorPage({ params }: PageProps<"/adm
         key={product?.id ?? NEW}
         product={product}
         currencies={CURRENCIES}
-        collections={collections.map((c) => c.name)}
+        collections={collections.map((c) => ({ id: c.id, name: c.name }))}
         sizePresets={SIZE_PRESETS}
       />
     </>

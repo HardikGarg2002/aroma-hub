@@ -25,7 +25,17 @@ type Generated = "id" | "created_at" | "updated_at";
 
 type NumericRead<T, K extends keyof T> = Omit<T, K> & { [P in K]: number | string };
 
-type ProductRow = NumericRead<AdminProduct, "price">;
+/** The `collection` text column is gone; membership lives in product_collections. */
+type ProductRow = NumericRead<
+  Omit<AdminProduct, "collection_ids" | "collection_names">,
+  "price"
+>;
+
+interface ProductCollectionRow {
+  product_id: string;
+  collection_id: string;
+  created_at: string;
+}
 type OrderRow = NumericRead<
   Omit<AdminOrder, "items" | "shipping_address" | "status" | "payment_status">,
   "subtotal" | "shipping" | "tax" | "discount" | "total"
@@ -46,7 +56,14 @@ interface Table<Row extends Record<string, unknown>, Insert> {
 export interface Database {
   public: {
     Tables: {
-      products: Table<ProductRow & Record<string, unknown>, Omit<AdminProduct, Generated>>;
+      products: Table<
+        ProductRow & Record<string, unknown>,
+        Omit<AdminProduct, Generated | "collection_ids" | "collection_names">
+      >;
+      product_collections: Table<
+        ProductCollectionRow & Record<string, unknown>,
+        Omit<ProductCollectionRow, "created_at">
+      >;
       collections: Table<
         AdminCollection & Record<string, unknown>,
         Omit<AdminCollection, Generated>

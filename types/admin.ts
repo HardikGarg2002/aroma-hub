@@ -8,7 +8,14 @@ export interface AdminProduct {
   price: number;
   currency: string;
   size_options: string[];
-  collection: string | null;
+  /**
+   * Collections this product belongs to, via the product_collections join
+   * table. A product can be in several at once (e.g. "Amber" and
+   * "Holiday Edit"), or none.
+   */
+  collection_ids: string[];
+  /** Names for the ids above, in the same order. Read-only; for display. */
+  collection_names: string[];
   image_url: string | null;
   is_active: boolean;
   /** ISO-8601 */
@@ -17,12 +24,18 @@ export interface AdminProduct {
   updated_at: string;
 }
 
-/** Fields an admin can edit; id and timestamps are server-managed. */
-export type AdminProductInput = Omit<AdminProduct, "id" | "created_at" | "updated_at">;
+/**
+ * Fields an admin can edit; id and timestamps are server-managed, and
+ * collection_names is derived from collection_ids on read.
+ */
+export type AdminProductInput = Omit<
+  AdminProduct,
+  "id" | "created_at" | "updated_at" | "collection_names"
+>;
 
 /**
- * Product collection. Membership isn't stored here: a product belongs to the
- * collection whose `name` matches its `collection` field.
+ * Product collection. Membership lives in the product_collections join table,
+ * so a product can belong to several collections at once.
  */
 export interface AdminCollection {
   id: string;

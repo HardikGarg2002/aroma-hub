@@ -61,16 +61,16 @@ export async function saveCollection(
     is_active: values.is_active === "true",
   };
 
-  let previousName: string | null = null;
+  // Membership is keyed by id, so a rename no longer has to rewrite members.
+  let collectionId = id;
   if (id) {
     const existing = await getCollection(id);
     if (!existing) return { errors: { form: "This collection no longer exists." }, values };
-    previousName = existing.name;
     await updateCollection(id, input);
   } else {
-    await createCollection(input);
+    collectionId = (await createCollection(input)).id;
   }
-  await setCollectionMembers(previousName, input.name, values.product_ids);
+  await setCollectionMembers(collectionId!, values.product_ids);
 
   revalidatePath("/admin/collections");
   revalidatePath("/admin/products");

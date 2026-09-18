@@ -12,7 +12,7 @@ type Props = {
   /** null = add mode */
   product: AdminProduct | null;
   currencies: readonly string[];
-  collections: readonly string[];
+  collections: readonly { id: string; name: string }[];
   sizePresets: readonly string[];
 };
 
@@ -25,7 +25,7 @@ function toValues(p: AdminProduct | null): ProductFormValues {
     price: p ? String(p.price) : "",
     currency: p?.currency ?? "CAD",
     size_options: p?.size_options ?? ["50 ml"],
-    collection: p?.collection ?? "",
+    collection_ids: p?.collection_ids ?? [],
     image_url: p?.image_url ?? "",
     is_active: String(p?.is_active ?? true),
   };
@@ -40,12 +40,12 @@ export function ProductForm({ product, currencies, collections, sizePresets }: P
 
   const [imageUrl, setImageUrl] = useState(values.image_url);
   const [sizes, setSizes] = useState<string[]>(values.size_options);
+  const [collectionIds, setCollectionIds] = useState<string[]>(values.collection_ids);
 
-  // A product saved with a collection that no longer exists still shows up.
-  const collectionOptions =
-    values.collection && !collections.includes(values.collection)
-      ? [...collections, values.collection]
-      : collections;
+  const toggleCollection = (id: string) =>
+    setCollectionIds((ids) =>
+      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+    );
 
   return (
     <form action={action} noValidate className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -121,13 +121,28 @@ export function ProductForm({ product, currencies, collections, sizePresets }: P
         </Section>
 
         <Section title="Organisation">
-          <Field label="Collection" hint="Optional">
-            <select name="collection" defaultValue={values.collection} className={input()}>
-              <option value="">No collection</option>
-              {collectionOptions.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+          <Field label="Collections" hint="Optional — a product can be in several">
+            {collections.length === 0 ? (
+              <p className="text-sm text-muted">No collections yet.</p>
+            ) : (
+              <ul className="grid gap-1 sm:grid-cols-2">
+                {collections.map((c) => (
+                  <li key={c.id}>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="collection_ids"
+                        value={c.id}
+                        checked={collectionIds.includes(c.id)}
+                        onChange={() => toggleCollection(c.id)}
+                        className="size-4 accent-ink"
+                      />
+                      <span className="truncate">{c.name}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Field>
         </Section>
 

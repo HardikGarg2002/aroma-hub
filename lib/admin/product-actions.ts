@@ -6,8 +6,13 @@ import type { AdminProductInput } from "@/types/admin";
 import { requireAdmin } from "./auth";
 import { createProduct, isProductCodeTaken, setProductActive, updateProduct } from "./products";
 
-export type ProductFormValues = Record<Exclude<keyof AdminProductInput, "size_options">, string> & {
+export type ProductFormValues = Record<
+  Exclude<keyof AdminProductInput, "size_options" | "collection_ids">,
+  string
+> & {
   size_options: string[];
+  /** Several collections per product; the form posts one value per checkbox. */
+  collection_ids: string[];
 };
 
 export type ProductFormState =
@@ -32,7 +37,7 @@ export async function saveProduct(_prev: ProductFormState, formData: FormData): 
     price: text("price"),
     currency: text("currency"),
     size_options: [...new Set(formData.getAll("size_options").map((s) => String(s).trim()).filter(Boolean))],
-    collection: text("collection"),
+    collection_ids: [...new Set(formData.getAll("collection_ids").map((s) => String(s).trim()).filter(Boolean))],
     image_url: text("image_url"),
     is_active: formData.get("is_active") === "on" ? "true" : "false",
   };
@@ -59,7 +64,7 @@ export async function saveProduct(_prev: ProductFormState, formData: FormData): 
     price: Math.round(price * 100) / 100,
     currency: values.currency,
     size_options: values.size_options,
-    collection: values.collection || null,
+    collection_ids: values.collection_ids,
     image_url: values.image_url || null,
     is_active: values.is_active === "true",
   };
