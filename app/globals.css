@@ -1,26 +1,350 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ------------------------------------------------------------------
+   AROMA design tokens
+   Light editorial: bone paper, ink type, one warm clay accent.
+   Everything below is exposed as Tailwind utilities via @theme,
+   e.g. bg-bone / text-ink / border-line / text-accent / font-display
+------------------------------------------------------------------ */
+@theme {
+  --color-bone: #f7f4ef;
+  --color-bone-deep: #efe9e0;
+  --color-paper: #ffffff;
+  --color-ink: #14120f;
+  --color-ink-soft: #3a352e;
+  --color-muted: #6b645a;
+  --color-line: #e2dbd0;
+  --color-accent: #9c6644;
+  --color-accent-soft: #c08b63;
+
+  /* Olfactive family tints — drive the notes explorer and card washes */
+  --color-floral: #e8c9ce;
+  --color-woody: #c2a786;
+  --color-amber: #e0b573;
+  --color-fresh: #bfd3cb;
+
+  --font-display: var(--font-cormorant), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Shared easings, mirrored in lib/motion.ts for JS-driven animation */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-expo: cubic-bezier(0.83, 0, 0.17, 1);
+
+  --shadow-lift: 0 24px 60px -24px rgb(20 18 15 / 0.18);
+  --shadow-card: 0 2px 30px -12px rgb(20 18 15 / 0.1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  html {
+    /* Lenis drives scrolling on capable devices; this is the fallback. */
+    scroll-behavior: smooth;
+    background-color: var(--color-bone);
+  }
+
+  /* Lenis owns the scroll position once mounted, so disable native smoothing
+     to stop the two fighting each other. */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  html.lenis {
+    scroll-behavior: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--color-bone);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background-color: var(--color-ink);
+    color: var(--color-bone);
+  }
+
+  /* Keyboard focus only — pointer clicks stay clean */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  /* Eyebrow / small-caps label used above every section heading */
+  .label {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  /* Page gutter — one source of truth for horizontal rhythm */
+  .shell {
+    width: 100%;
+    max-width: 1600px;
+    margin-inline: auto;
+    padding-inline: 20px;
+  }
+  @media (min-width: 768px) {
+    .shell {
+      padding-inline: 40px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .shell {
+      padding-inline: 64px;
+    }
+  }
+
+  /* Masked text reveal: the clip is on the parent, the transform on the child.
+     `display` is deliberately left to the caller (`block` for lines,
+     `inline-block` for words) — setting it here would beat those utilities.
+     The generous horizontal bleed stops italic serifs being shaved off. */
+  .reveal-mask {
+    overflow: hidden;
+    vertical-align: top;
+    clip-path: inset(-0.1em -0.35em -0.05em -0.12em);
+  }
+
+  .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Anyone who asks for less motion gets a static, fully-visible page. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Intro curtain (components/ui/LoaderCurtain.tsx)
+   Hidden unless the component opts in via data-play, so it never
+   appears in the server HTML or for reduced-motion visitors.
+------------------------------------------------------------------ */
+.aroma-curtain {
+  display: none;
+}
+
+.aroma-curtain[data-play="true"] {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bone);
+  animation: aroma-curtain 1.15s var(--ease-in-out-expo) forwards;
+}
+
+.aroma-curtain[data-play="true"] .aroma-curtain-mark {
+  animation: aroma-curtain-mark 1.15s var(--ease-in-out-expo) forwards;
+}
+
+@keyframes aroma-curtain {
+  0%,
+  64% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes aroma-curtain-mark {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  30%,
+  56% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  82%,
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Above-the-fold entrance animations.
+
+   These are CSS, not JS, on purpose. Anything driven by Motion's
+   `initial` prop is rendered into the server HTML in its hidden state,
+   so the hero would stay invisible until the JS bundle has downloaded
+   and hydrated — seconds on a cold cache or a slow connection. CSS
+   ships with the stylesheet and runs on first paint instead.
+
+   Each element sets its own delay with `--d`. `backwards` fill applies
+   the 0% frame during that delay; `forwards` holds the final frame.
+------------------------------------------------------------------ */
+.rise {
+  animation: aroma-rise 1s var(--ease-out-expo) both;
+  animation-delay: var(--d, 0s);
+}
+
+/* Slides a masked line of display type up into its clip window. */
+.mask-up {
+  display: block;
+  animation: aroma-mask-up 1.3s var(--ease-out-expo) both;
+  animation-delay: var(--d, 0s);
+  will-change: transform;
+}
+
+/* Reveals an image by lifting the clip edge. */
+.wipe-up {
+  animation: aroma-wipe-up 1.5s var(--ease-out-expo) both;
+  animation-delay: var(--d, 0s);
+}
+
+/* Hold the entrance animations while the intro curtain is covering the
+   page, so the reveal is not spent behind it. Set only by JS, so the
+   no-JS default is that the hero animates straight away. */
+html[data-intro="playing"] .rise,
+html[data-intro="playing"] .mask-up,
+html[data-intro="playing"] .wipe-up {
+  animation-play-state: paused;
+}
+
+@keyframes aroma-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aroma-mask-up {
+  from {
+    transform: translateY(108%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes aroma-wipe-up {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Reduced motion: show everything immediately, in place. The global
+   duration override above already collapses the timing; this makes sure
+   nothing is left mid-keyframe. */
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .mask-up,
+  .wipe-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Scroll reveals.
+
+   The default state is VISIBLE. Elements are only hidden once the
+   inline reveal script (components/providers/RevealScript.tsx) has
+   added `.js` to <html>, which it does before first paint — and that
+   same script owns the IntersectionObserver that adds `.is-visible`.
+
+   This is the whole point: the hidden state and the thing that undoes
+   it ship together in the HTML. Nothing here waits on the JS bundle,
+   so a slow or failed bundle leaves the page fully readable instead
+   of blank.
+------------------------------------------------------------------ */
+.js [data-reveal] {
+  --reveal-dur: 0.7s;
+}
+
+/* Fade + rise (FadeIn) */
+.js .reveal-rise {
+  opacity: 0;
+  transform: translateY(var(--reveal-y, 28px));
+}
+.js .reveal-rise.is-visible {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--reveal-dur) var(--ease-out-expo) var(--reveal-delay, 0s),
+    transform var(--reveal-dur) var(--ease-out-expo) var(--reveal-delay, 0s);
+}
+
+/* Masked word/line reveal (RevealText). The trigger is the parent;
+   each word carries its own stagger delay in --d. */
+.js [data-reveal] .reveal-word > span {
+  display: inline-block;
+  transform: translateY(110%);
+}
+.js [data-reveal].is-visible .reveal-word > span {
+  transform: translateY(0);
+  transition: transform 1.25s var(--ease-out-expo) var(--d, 0s);
+}
+
+/* Hairline that draws in (Rule) */
+.js .reveal-rule {
+  transform: scaleX(0);
+}
+.js .reveal-rule.is-visible {
+  transform: scaleX(1);
+  transition: transform 1.1s var(--ease-in-out-expo) var(--reveal-delay, 0s);
+}
+
+/* Reduced motion: never hide anything, never transition. */
+@media (prefers-reduced-motion: reduce) {
+  .js .reveal-rise,
+  .js .reveal-rule,
+  .js [data-reveal] .reveal-word > span {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
