@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { m } from "motion/react";
 import { cn } from "@/lib/cn";
 import { EASE_OUT } from "@/lib/motion";
@@ -10,6 +10,8 @@ import { NavLinks } from "@/components/layout/NavLinks";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { CartButton } from "@/components/layout/CartButton";
 import { CartSheet } from "@/components/cart/CartSheet";
+import { SearchDialog } from "@/components/search/SearchDialog";
+import { useSearchUi } from "@/lib/ui/search-store";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 
 /**
@@ -18,10 +20,25 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
  */
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const searchOpen = useSearchUi((s) => s.open);
+  const openSearch = useSearchUi((s) => s.openSearch);
+  const closeSearch = useSearchUi((s) => s.closeSearch);
+
+  // ⌘K / Ctrl+K opens search from anywhere on the storefront.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openSearch();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [openSearch]);
   const { direction, isScrolled, isAtTop } = useScrollDirection(90);
 
   // Stay put while the mobile menu is open, otherwise it retracts underneath it.
-  const hidden = direction === "down" && isScrolled && !menuOpen;
+  const hidden = direction === "down" && isScrolled && !menuOpen && !searchOpen;
 
   return (
     <>
@@ -71,20 +88,20 @@ export function Header() {
 
           {/* Right: utilities */}
           <div className="flex flex-1 items-center justify-end gap-5 md:gap-7">
-            <Link
-              href="/search"
+            <button
+              type="button"
+              onClick={openSearch}
               aria-label="Search"
-              className="hidden text-[12px] font-medium uppercase tracking-[0.16em] md:block"
+              aria-haspopup="dialog"
+              aria-expanded={searchOpen}
+              className="flex items-center text-[12px] font-medium uppercase tracking-[0.16em]"
             >
-              Search
-            </Link>
-            <Link
-              href="/account"
-              aria-label="Account"
-              className="hidden text-[12px] font-medium uppercase tracking-[0.16em] md:block"
-            >
-              Account
-            </Link>
+              <span className="hidden md:inline">Search</span>
+              <svg viewBox="0 0 24 24" className="h-5 w-5 md:hidden" fill="none" aria-hidden>
+                <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="m16 16 4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
             <CartButton />
           </div>
         </div>
@@ -93,6 +110,7 @@ export function Header() {
       <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       {/* Outside the header: its transform would otherwise anchor the fixed sheet. */}
       <CartSheet />
+      <SearchDialog open={searchOpen} onClose={closeSearch} />
     </>
   );
 }

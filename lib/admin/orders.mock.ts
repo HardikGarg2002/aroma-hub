@@ -1,7 +1,8 @@
-import type { AdminOrder, AdminOrderItem, OrderStatus, PaymentStatus } from "@/types/admin";
+import type { AdminOrder, AdminOrderItem, NewOrder, OrderStatus, PaymentStatus } from "@/types/admin";
 // The products facade, not products.mock: with ADMIN_ORDERS_SOURCE=mock and
 // products on Supabase, sample orders are made of the real catalogue.
 import { listProducts } from "./products";
+import { shippingFor, taxRate } from "@/lib/checkout/pricing";
 
 /**
  * Mock order store — same contract as lib/admin/products.ts: in memory,
@@ -24,8 +25,6 @@ const CUSTOMERS = [
   ["Benjamin Côté", "Victoria", "BC", "V8W 1N4", "812 Wharf St"],
 ] as const;
 
-/** Rough combined sales tax by province, enough for believable mock totals. */
-const TAX_RATE: Record<string, number> = { ON: 0.13, QC: 0.14975, BC: 0.12, AB: 0.05, NS: 0.15, MB: 0.12 };
 
 /** Deterministic PRNG so every server start produces the same sample orders. */
 function rng(seed: number) {
@@ -39,10 +38,9 @@ const round = (n: number) => Math.round(n * 100) / 100;
 const DAY = 86_400_000;
 const ORDER_COUNT = 60;
 
-/** Matches the storefront announcement bar. */
-const FREE_SHIPPING_FROM = 95;
 
 /** Flat coupons from coupons.mock.ts, best first, so mock discounts look real. */
+const COUPON_CODES: Record<number, string> = { 35: "SAVE35", 20: "AROMA20", 10: "WELCOME10" };
 const COUPONS: [minimum: number, off: number][] = [
   [200, 35],
   [120, 20],
@@ -100,8 +98,9 @@ async function seed(): Promise<AdminOrder[]> {
     const subtotal = round(items.reduce((sum, it) => sum + it.unit_price * it.quantity, 0));
     // About one order in three used the best coupon it qualified for.
     const discount = rand() < 0.33 ? (COUPONS.find(([min]) => subtotal >= min)?.[1] ?? 0) : 0;
-    const shipping = subtotal - discount >= FREE_SHIPPING_FROM ? 0 : 12;
-    const tax = round((subtotal - discount + shipping) * (TAX_RATE[province] ?? 0.13));
+    // Same rules as real checkout (lib/checkout/pricing.ts).
+    const shipping = shippingFor(subtotal - discount);
+    const tax = round((subtotal - discount + shipping) * taxRate(province));
 
     orders.push({
       id: `0dde7000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
@@ -120,6 +119,9 @@ async function seed(): Promise<AdminOrder[]> {
       total: round(subtotal - discount + shipping + tax),
       currency: catalogue.find((p) => p.id === items[0].product_id)?.currency ?? "CAD",
       notes: i % 7 === 1 ? "Gift wrap, please — it's a birthday present." : null,
+      coupon_code: discount ? (COUPON_CODES[discount] ?? null) : null,
+      payment_provider: payment_status === "unpaid" ? null : "paypal",
+      payment_reference: null,
       created_at: new Date(created).toISOString(),
       updated_at: new Date(Math.min(now, created + 36e5 * (1 + (i % 5)))).toISOString(),
     });
@@ -149,4 +151,23 @@ export async function updateOrderStatus(
   if (!order) return null;
   Object.assign(order, patch, { updated_at: new Date().toISOString() });
   return order;
+}
+
+export async function createOrder(input: NewOrder): Promise<AdminOrder> {
+  const list = await orders();
+  const highest = list.reduce((n, o) => Math.max(n, Number(o.order_number.replace(/\D/g, "")) || 0), 1000);
+  const now = new Date().toISOString();
+  const order: AdminOrder = {
+    ...input,
+    id: crypto.randomUUID(),
+    order_number: `AR-${highest + 1}`,
+    created_at: now,
+    updated_at: now,
+  };
+  list.push(order);
+  return order;
+}
+
+export async function getOrderByPaymentReference(reference: string): Promise<AdminOrder | null> {
+  return (await orders()).find((o) => o.payment_reference === reference) ?? null;
 }

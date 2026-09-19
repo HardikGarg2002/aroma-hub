@@ -5,6 +5,7 @@ import { m, useScroll, useTransform } from "motion/react";
 import { SITE_IMAGES } from "@/lib/images";
 import { ParallaxImage } from "@/components/ui/ParallaxImage";
 import { MagneticButton } from "@/components/ui/MagneticButton";
+import { useSearchUi } from "@/lib/ui/search-store";
 
 const HEADLINE = ["Notes of", "the", "unfamiliar"];
 
@@ -22,6 +23,7 @@ const HEADLINE = ["Notes of", "the", "unfamiliar"];
  */
 export function Hero() {
   const ref = useRef<HTMLElement>(null);
+  const openSearch = useSearchUi((s) => s.openSearch);
 
   // Lift and fade the copy as the next section arrives underneath it.
   const { scrollYProgress } = useScroll({
@@ -96,7 +98,7 @@ export function Hero() {
               style={{ "--d": "0.74s" } as React.CSSProperties}
             >
               <MagneticButton href="/shop">Explore the collection</MagneticButton>
-              <MagneticButton href="/quiz" variant="outline">
+              <MagneticButton onClick={openSearch} variant="outline">
                 Find your scent
               </MagneticButton>
             </div>

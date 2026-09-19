@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useCartStore } from "./store";
 
 /**
@@ -17,4 +17,14 @@ export function useCartHydration() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+}
+
+/** True once the persisted cart has been loaded into the store. */
+export function useCartHydrated() {
+  return useSyncExternalStore(
+    (onChange) => useCartStore.persist.onFinishHydration(onChange),
+    () => useCartStore.persist.hasHydrated(),
+    // The server never has the browser's cart.
+    () => false,
+  );
 }

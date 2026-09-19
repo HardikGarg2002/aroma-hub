@@ -68,7 +68,11 @@ export interface Database {
         AdminCollection & Record<string, unknown>,
         Omit<AdminCollection, Generated>
       >;
-      orders: Table<OrderRow & Record<string, unknown>, Omit<AdminOrder, Generated>>;
+      // order_number has a database default (see 0004_checkout.sql).
+      orders: Table<
+        OrderRow & Record<string, unknown>,
+        Omit<AdminOrder, Generated | "order_number"> & { order_number?: string }
+      >;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

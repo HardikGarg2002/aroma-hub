@@ -1,7 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { AdminOrder, OrderStatus, PaymentStatus } from "@/types/admin";
+import type { AdminOrder, NewOrder, OrderStatus, PaymentStatus } from "@/types/admin";
 import type { Database } from "@/types/database";
 
 /**
@@ -15,7 +15,7 @@ const TABLE = "orders";
 
 /** Single literal, not a concatenation: the SDK statically parses this string. */
 const COLUMNS =
-  "id, order_number, status, payment_status, customer_name, customer_email, customer_phone, shipping_address, items, subtotal, shipping, tax, discount, total, currency, notes, created_at, updated_at" as const;
+  "id, order_number, status, payment_status, customer_name, customer_email, customer_phone, shipping_address, items, subtotal, shipping, tax, discount, total, currency, notes, coupon_code, payment_provider, payment_reference, created_at, updated_at" as const;
 
 /** postgres `numeric` arrives as a string over PostgREST; AdminOrder wants numbers. */
 type Row = Database["public"]["Tables"]["orders"]["Row"];
@@ -65,5 +65,22 @@ export async function updateOrderStatus(
     .maybeSingle();
 
   if (error) throw new Error(`Failed to update order: ${error.message}`);
+  return data ? toOrder(data) : null;
+}
+
+export async function createOrder(input: NewOrder): Promise<AdminOrder> {
+  const { data, error } = await supabaseAdmin().from(TABLE).insert(input).select(COLUMNS).single();
+  if (error) throw new Error(`Failed to create order: ${error.message}`);
+  return toOrder(data);
+}
+
+export async function getOrderByPaymentReference(reference: string): Promise<AdminOrder | null> {
+  const { data, error } = await supabaseAdmin()
+    .from(TABLE)
+    .select(COLUMNS)
+    .eq("payment_reference", reference)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to look up order: ${error.message}`);
   return data ? toOrder(data) : null;
 }

@@ -56,6 +56,16 @@ export function AdminSidebar({ username }: { username: string }) {
         </nav>
 
         <div className="mt-6 border-t border-line pt-4 md:mt-auto">
+          <Link
+            href="/"
+            onClick={() => setOpen(false)}
+            className="mb-3 flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink-soft transition-colors hover:bg-bone-deep hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden>
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Back to store
+          </Link>
           <p className="px-3 text-xs text-muted">
             Signed in as <span className="font-medium text-ink">{username}</span>
           </p>

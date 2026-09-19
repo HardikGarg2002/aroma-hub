@@ -96,11 +96,20 @@ export interface AdminOrder {
   total: number;
   currency: string;
   notes: string | null;
+  /** Coupon redeemed on this order, if any. */
+  coupon_code: string | null;
+  /** How it was paid, e.g. "paypal"; null for orders not placed via checkout. */
+  payment_provider: string | null;
+  /** The provider's id for the payment (the PayPal order id). Unique. */
+  payment_reference: string | null;
   /** ISO-8601 */
   created_at: string;
   /** ISO-8601 */
   updated_at: string;
 }
+
+/** What checkout hands the order store; ids, number and timestamps are generated. */
+export type NewOrder = Omit<AdminOrder, "id" | "order_number" | "created_at" | "updated_at">;
 
 /**
  * Flat-amount discount code. Applies once per order when the cart subtotal

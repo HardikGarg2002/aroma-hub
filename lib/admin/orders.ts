@@ -13,3 +13,5 @@ const impl = ORDERS_SOURCE === "supabase" ? db : mock;
 export const listOrders = impl.listOrders;
 export const getOrder = impl.getOrder;
 export const updateOrderStatus = impl.updateOrderStatus;
+export const createOrder = impl.createOrder;
+export const getOrderByPaymentReference = impl.getOrderByPaymentReference;

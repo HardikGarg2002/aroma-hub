@@ -79,7 +79,12 @@ export default async function AdminOrderDetailPage({ params }: PageProps<"/admin
             </ul>
             <dl className="space-y-2 border-t border-line px-6 py-4 text-sm">
               <Row label="Subtotal" value={money(order.subtotal)} />
-              {order.discount > 0 && <Row label="Discount" value={`−${money(order.discount)}`} />}
+              {order.discount > 0 && (
+                <Row
+                  label={order.coupon_code ? `Discount (${order.coupon_code})` : "Discount"}
+                  value={`−${money(order.discount)}`}
+                />
+              )}
               <Row label="Shipping" value={order.shipping === 0 ? "Free" : money(order.shipping)} />
               <Row label="Tax" value={money(order.tax)} />
               <div className="flex justify-between border-t border-line pt-3 text-base font-medium">
@@ -104,6 +109,23 @@ export default async function AdminOrderDetailPage({ params }: PageProps<"/admin
               status={order.status}
               paymentStatus={order.payment_status}
             />
+          </Section>
+
+          <Section title="Payment">
+            <dl className="space-y-1 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted">Method</dt>
+                <dd>{order.payment_provider === "paypal" ? "PayPal" : (order.payment_provider ?? "—")}</dd>
+              </div>
+              {order.payment_reference && (
+                <div className="flex justify-between gap-3">
+                  <dt className="shrink-0 text-muted">Reference</dt>
+                  <dd className="truncate font-mono text-xs" title={order.payment_reference}>
+                    {order.payment_reference}
+                  </dd>
+                </div>
+              )}
+            </dl>
           </Section>
 
           <Section title="Customer">
