@@ -9,6 +9,7 @@ import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { NavLinks } from "@/components/layout/NavLinks";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { CartButton } from "@/components/layout/CartButton";
+import { CartSheet } from "@/components/cart/CartSheet";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 
 /**
@@ -84,12 +85,14 @@ export function Header() {
             >
               Account
             </Link>
-            <CartButton count={2} />
+            <CartButton />
           </div>
         </div>
       </m.header>
 
       <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      {/* Outside the header: its transform would otherwise anchor the fixed sheet. */}
+      <CartSheet />
     </>
   );
 }

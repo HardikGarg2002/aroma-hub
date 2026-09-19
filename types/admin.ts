@@ -101,3 +101,27 @@ export interface AdminOrder {
   /** ISO-8601 */
   updated_at: string;
 }
+
+/**
+ * Flat-amount discount code. Applies once per order when the cart subtotal
+ * (before shipping and tax) is at least `min_cart_value`.
+ */
+export interface AdminCoupon {
+  id: string;
+  /** Uppercase, unique; what the customer types. */
+  code: string;
+  /** Internal note, e.g. which campaign it's for. */
+  description: string | null;
+  /** Amount taken off the subtotal, in `currency`. */
+  discount_amount: number;
+  /** Subtotal required before the coupon applies; 0 means no minimum. */
+  min_cart_value: number;
+  currency: string;
+  is_active: boolean;
+  /** ISO-8601 */
+  created_at: string;
+  /** ISO-8601 */
+  updated_at: string;
+}
+
+export type AdminCouponInput = Omit<AdminCoupon, "id" | "created_at" | "updated_at">;

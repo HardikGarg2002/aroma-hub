@@ -16,3 +16,15 @@ export const DATA_SOURCE: DataSource = (() => {
 })();
 
 export const usingSupabase = DATA_SOURCE === "supabase";
+
+/**
+ * Orders can be sourced separately, so sample orders can fill the dashboard
+ * while products and collections stay on Supabase. ADMIN_ORDERS_SOURCE=mock
+ * uses in-memory orders built from the *current* product catalogue
+ * (whichever source that is); unset, orders follow DATA_SOURCE.
+ */
+export const ORDERS_SOURCE: DataSource = (() => {
+  const configured = process.env.ADMIN_ORDERS_SOURCE?.trim().toLowerCase();
+  if (configured === "mock" || configured === "supabase") return configured;
+  return DATA_SOURCE;
+})();

@@ -16,6 +16,9 @@
   --color-line: #e2dbd0;
   --color-accent: #9c6644;
   --color-accent-soft: #c08b63;
+  /* Single-series chart mark: the clay accent, re-stepped for chroma so it
+     doesn't read gray as a data color (validated: lightness, chroma, >=3:1). */
+  --color-chart: #a8622f;
 
   /* Olfactive family tints — drive the notes explorer and card washes */
   --color-floral: #e8c9ce;

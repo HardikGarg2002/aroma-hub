@@ -73,6 +73,9 @@ export async function saveCollection(
   await setCollectionMembers(collectionId!, values.product_ids);
 
   revalidatePath("/admin/collections");
+  revalidatePath("/collections");
+  revalidatePath("/shop");
+  revalidatePath("/products/[id]", "page");
   revalidatePath("/admin/products");
   redirect("/admin/collections");
 }
@@ -82,4 +85,7 @@ export async function toggleCollectionActive(id: string, isActive: boolean) {
   await requireAdmin();
   if (!(await setCollectionActive(id, isActive))) throw new Error("Collection not found.");
   revalidatePath("/admin/collections");
+  revalidatePath("/collections");
+  revalidatePath("/shop");
+  revalidatePath("/products/[id]", "page");
 }

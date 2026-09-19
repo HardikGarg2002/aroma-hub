@@ -1,9 +1,14 @@
 import type { AdminOrder, AdminOrderItem, OrderStatus, PaymentStatus } from "@/types/admin";
-import { listProducts } from "./products.mock";
+// The products facade, not products.mock: with ADMIN_ORDERS_SOURCE=mock and
+// products on Supabase, sample orders are made of the real catalogue.
+import { listProducts } from "./products";
 
 /**
  * Mock order store — same contract as lib/admin/products.ts: in memory,
  * survives hot reloads, resets on server restart. Replace with DB queries.
+ *
+ * Seeded once, from whatever products exist at that moment; restart the
+ * server to regenerate after big catalogue changes.
  */
 
 const CUSTOMERS = [
@@ -22,13 +27,6 @@ const CUSTOMERS = [
 /** Rough combined sales tax by province, enough for believable mock totals. */
 const TAX_RATE: Record<string, number> = { ON: 0.13, QC: 0.14975, BC: 0.12, AB: 0.05, NS: 0.15, MB: 0.12 };
 
-// Status/payment pairs that make sense together, most recent orders first.
-const STATES: [OrderStatus, PaymentStatus][] = [
-  ["pending", "unpaid"], ["pending", "paid"], ["processing", "paid"], ["processing", "paid"],
-  ["shipped", "paid"], ["shipped", "paid"], ["delivered", "paid"], ["delivered", "paid"],
-  ["cancelled", "refunded"], ["delivered", "paid"],
-];
-
 /** Deterministic PRNG so every server start produces the same sample orders. */
 function rng(seed: number) {
   return () => {
@@ -38,42 +36,76 @@ function rng(seed: number) {
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+const DAY = 86_400_000;
+const ORDER_COUNT = 60;
+
+/** Matches the storefront announcement bar. */
+const FREE_SHIPPING_FROM = 95;
+
+/** Flat coupons from coupons.mock.ts, best first, so mock discounts look real. */
+const COUPONS: [minimum: number, off: number][] = [
+  [200, 35],
+  [120, 20],
+  [50, 10],
+];
+
+/** Newest orders are still in flight; older ones have been delivered. */
+function stateFor(i: number): [OrderStatus, PaymentStatus] {
+  if (i > 0 && i % 11 === 0) return ["cancelled", "refunded"];
+  if (i === 0) return ["pending", "unpaid"];
+  if (i < 3) return ["pending", "paid"];
+  if (i < 7) return ["processing", "paid"];
+  if (i < 14) return ["shipped", "paid"];
+  return ["delivered", "paid"];
+}
 
 async function seed(): Promise<AdminOrder[]> {
-  const catalogue = await listProducts();
+  // Active, purchasable products only, in a stable order so the same
+  // products come out as best sellers on every start.
+  const catalogue = (await listProducts())
+    .filter((p) => p.is_active)
+    .sort((a, b) => a.product_code.localeCompare(b.product_code));
+  if (catalogue.length === 0) return [];
+
   const rand = rng(42);
-  const now = Date.parse("2026-09-18T15:00:00Z");
+  // A skewed pick (rand²) so a handful of products clearly lead.
+  const pickProduct = () => catalogue[Math.floor(rand() ** 2 * catalogue.length)];
+
+  // Dated relative to now, so every dashboard range has data whenever the
+  // server starts. Gaps widen further back: busier recently, like a growing store.
+  const now = Date.now();
+  let created = now - 3 * 36e5;
   const orders: AdminOrder[] = [];
 
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < ORDER_COUNT; i++) {
     const [name, city, province, postal, line1] = CUSTOMERS[i % CUSTOMERS.length];
-    const [status, payment_status] = STATES[i % STATES.length];
+    const [status, payment_status] = stateFor(i);
 
     const items: AdminOrderItem[] = [];
     const lineCount = 1 + Math.floor(rand() * 3);
     for (let j = 0; j < lineCount; j++) {
-      const p = catalogue[Math.floor(rand() * catalogue.length)];
+      const p = pickProduct();
       if (items.some((it) => it.product_id === p.id)) continue;
       items.push({
         product_id: p.id,
         product_code: p.product_code,
         name: p.name,
-        size: p.size_options[Math.floor(rand() * p.size_options.length)],
+        size: p.size_options[Math.floor(rand() * p.size_options.length)] ?? "50ml",
         image_url: p.image_url,
         unit_price: p.price,
-        quantity: 1 + Math.floor(rand() * 2),
+        quantity: rand() < 0.75 ? 1 : 2,
       });
     }
 
     const subtotal = round(items.reduce((sum, it) => sum + it.unit_price * it.quantity, 0));
-    const discount = i % 5 === 3 ? round(subtotal * 0.1) : 0;
-    const shipping = subtotal - discount >= 150 ? 0 : 12;
+    // About one order in three used the best coupon it qualified for.
+    const discount = rand() < 0.33 ? (COUPONS.find(([min]) => subtotal >= min)?.[1] ?? 0) : 0;
+    const shipping = subtotal - discount >= FREE_SHIPPING_FROM ? 0 : 12;
     const tax = round((subtotal - discount + shipping) * (TAX_RATE[province] ?? 0.13));
-    const created = now - i * 86_400_000 * 1.6 - Math.floor(rand() * 36e5 * 8);
 
     orders.push({
       id: `0dde7000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
-      order_number: `AR-${1060 - i}`,
+      order_number: `AR-${1000 + ORDER_COUNT - i}`,
       status,
       payment_status,
       customer_name: name,
@@ -86,11 +118,14 @@ async function seed(): Promise<AdminOrder[]> {
       tax,
       discount,
       total: round(subtotal - discount + shipping + tax),
-      currency: "CAD",
-      notes: i % 6 === 1 ? "Gift wrap, please — it's a birthday present." : null,
+      currency: catalogue.find((p) => p.id === items[0].product_id)?.currency ?? "CAD",
+      notes: i % 7 === 1 ? "Gift wrap, please — it's a birthday present." : null,
       created_at: new Date(created).toISOString(),
-      updated_at: new Date(created + 36e5 * (i % 4)).toISOString(),
+      updated_at: new Date(Math.min(now, created + 36e5 * (1 + (i % 5)))).toISOString(),
     });
+
+    // Next (older) order: 0.3–1.5 days back near today, up to ~3 days back later.
+    created -= DAY * (0.3 + rand() * (1.2 + i / 30));
   }
   return orders;
 }

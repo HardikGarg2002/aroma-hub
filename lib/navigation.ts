@@ -1,11 +1,16 @@
-/** Primary navigation. These routes are built out in later passes. */
-export const NAV_LINKS = [
+/**
+ * Primary navigation. These routes are built out in later passes.
+ * `wideOnly` links are dropped from the desktop bar below 2xl, where six
+ * links would push the centred wordmark off-centre; the mobile menu shows all.
+ */
+export const NAV_LINKS: readonly { label: string; href: string; wideOnly?: boolean }[] = [
   { label: "Shop All", href: "/shop" },
-  { label: "Floral", href: "/shop/floral" },
-  { label: "Woody", href: "/shop/woody" },
-  { label: "Amber", href: "/shop/amber" },
-  { label: "Fresh", href: "/shop/fresh" },
-] as const;
+  { label: "Collections", href: "/collections" },
+  { label: "Floral", href: "/shop/floral", wideOnly: true },
+  { label: "Woody", href: "/shop/woody", wideOnly: true },
+  { label: "Amber", href: "/shop/amber", wideOnly: true },
+  { label: "Fresh", href: "/shop/fresh", wideOnly: true },
+];
 
 export const FOOTER_COLUMNS = [
   {

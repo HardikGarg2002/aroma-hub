@@ -37,7 +37,7 @@ export function AdminSidebar({ username }: { username: string }) {
       >
         <nav aria-label="Admin" className="flex flex-col gap-0.5">
           {ADMIN_NAV.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const active = pathname === item.href || (!item.exact && pathname.startsWith(`${item.href}/`));
             return (
               <Link
                 key={item.href}

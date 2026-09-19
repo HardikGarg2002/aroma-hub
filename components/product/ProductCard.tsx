@@ -9,6 +9,7 @@ import { BLUR } from "@/lib/images";
 import { formatPrice } from "@/lib/products";
 import { EASE_OUT } from "@/lib/motion";
 import type { Product } from "@/types/product";
+import { CartControl } from "@/components/cart/CartControl";
 
 const BADGE_COPY: Record<NonNullable<Product["badge"]>, string> = {
   new: "New",
@@ -30,9 +31,12 @@ interface ProductCardProps {
  * The single product tile used by every grid and carousel on the site.
  *
  * Hover swaps to a second angle, lifts a family-tinted wash behind the
- * bottle, and slides the price row up to expose a quick-view affordance.
- * Everything is also driven by focus-within, so keyboard users get the
- * same reveal.
+ * bottle, and raises an add-to-cart bar (a quantity stepper once the item is
+ * in the cart). Everything is also driven by focus-within, so keyboard users
+ * get the same reveal.
+ *
+ * The image and the meta are separate links so the cart bar, which is a
+ * button, never ends up nested inside an <a>.
  */
 export function ProductCard({
   product,
@@ -51,6 +55,8 @@ export function ProductCard({
     setHoverLoaded(true);
   };
 
+  const href = `/products/${product.slug}`;
+
   const ratioClass = {
     portrait: "aspect-[4/5]",
     tall: "aspect-[3/4.4]",
@@ -62,18 +68,24 @@ export function ProductCard({
       className={cn("group relative", className)}
       onHoverStart={engage}
       onHoverEnd={() => setHovered(false)}
+      onFocus={engage}
+      onBlur={(event) => {
+        // Moving focus between the card's own links/buttons isn't leaving it.
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHovered(false);
+      }}
     >
-      <Link
-        href={`/products/${product.slug}`}
-        className="block focus-visible:outline-none"
-        onFocus={engage}
-        onBlur={() => setHovered(false)}
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-[2px] bg-paper",
+          ratioClass,
+        )}
       >
-        <div
-          className={cn(
-            "relative overflow-hidden rounded-[2px] bg-paper",
-            ratioClass,
-          )}
+        {/* Duplicate of the name link below, so kept out of tab order and the a11y tree. */}
+        <Link
+          href={href}
+          tabIndex={-1}
+          aria-hidden
+          className="absolute inset-0 block focus-visible:outline-none"
         >
           {/* Family-tinted wash that bleeds in behind the bottle */}
           <m.div
@@ -125,34 +137,38 @@ export function ProductCard({
               />
             </m.div>
           ) : null}
+        </Link>
 
-          {product.badge ? (
-            <span className="absolute left-4 top-4 z-10 rounded-full bg-bone/90 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-ink backdrop-blur-sm">
-              {BADGE_COPY[product.badge]}
-            </span>
-          ) : null}
+        {product.badge ? (
+          <span className="pointer-events-none absolute left-4 top-4 z-10 rounded-full bg-bone/90 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-ink backdrop-blur-sm">
+            {BADGE_COPY[product.badge]}
+          </span>
+        ) : null}
 
-          {index !== undefined ? (
-            <span
-              aria-hidden
-              className="absolute right-4 top-3 z-10 font-display text-5xl font-light leading-none text-ink/25"
-            >
-              {String(index + 1).padStart(2, "0")}
-            </span>
-          ) : null}
-
-          {/* Quick view — rises out of the bottom edge */}
-          <m.div
+        {index !== undefined ? (
+          <span
             aria-hidden
-            className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center bg-ink py-3.5 text-[11px] font-medium uppercase tracking-[0.18em] text-bone"
-            initial={false}
-            animate={{ y: hovered ? "0%" : "100%" }}
-            transition={{ duration: 0.45, ease: EASE_OUT }}
+            className="pointer-events-none absolute right-4 top-3 z-10 font-display text-5xl font-light leading-none text-ink/25"
           >
-            Quick view
-          </m.div>
-        </div>
+            {String(index + 1).padStart(2, "0")}
+          </span>
+        ) : null}
 
+        <CartControl
+          variant="overlay"
+          className="absolute inset-x-0 bottom-0 z-10"
+          product={{
+            id: product.id,
+            name: product.name,
+            image_url: product.image,
+            price: product.price,
+            currency: "CAD",
+            size_options: [product.size],
+          }}
+        />
+      </div>
+
+      <Link href={href} className="block focus-visible:outline-none">
         {/* Meta */}
         <div className="mt-5 flex items-start justify-between gap-4">
           <div className="min-w-0">

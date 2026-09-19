@@ -66,3 +66,10 @@ export const SITE_IMAGES = {
   /** Wide band behind the newsletter block. */
   newsletter: u("photo-1714682597753-a646ba506cee", 1800),
 } as const;
+
+/**
+ * Whether next/image may optimize this URL, i.e. its host is allowlisted in
+ * next.config.ts. Admin-entered URLs can point anywhere; render those with
+ * `unoptimized` instead of letting next/image throw.
+ */
+export const canOptimize = (src: string) => src.startsWith(`${CDN}/`);

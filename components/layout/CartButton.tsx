@@ -2,17 +2,19 @@
 
 import { m } from "motion/react";
 import { cn } from "@/lib/cn";
+import { selectCount, useCartStore } from "@/lib/cart/store";
 
-interface CartButtonProps {
-  /** Static for now — wired to real cart state once the API exists. */
-  count?: number;
-  className?: string;
-}
+export function CartButton({ className }: { className?: string }) {
+  const count = useCartStore(selectCount);
+  const isOpen = useCartStore((s) => s.isOpen);
+  const open = useCartStore((s) => s.open);
 
-export function CartButton({ count = 0, className }: CartButtonProps) {
   return (
     <button
       type="button"
+      onClick={open}
+      aria-haspopup="dialog"
+      aria-expanded={isOpen}
       aria-label={`Open cart, ${count} ${count === 1 ? "item" : "items"}`}
       className={cn(
         "group relative flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.16em]",

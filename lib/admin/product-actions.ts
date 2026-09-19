@@ -77,6 +77,9 @@ export async function saveProduct(_prev: ProductFormState, formData: FormData): 
   }
 
   revalidatePath("/admin/products");
+  revalidatePath("/collections");
+  revalidatePath("/shop");
+  revalidatePath("/products/[id]", "page");
   redirect("/admin/products");
 }
 
@@ -85,4 +88,7 @@ export async function toggleProductActive(id: string, isActive: boolean) {
   await requireAdmin();
   if (!(await setProductActive(id, isActive))) throw new Error("Product not found.");
   revalidatePath("/admin/products");
+  revalidatePath("/collections");
+  revalidatePath("/shop");
+  revalidatePath("/products/[id]", "page");
 }

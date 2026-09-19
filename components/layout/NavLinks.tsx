@@ -13,10 +13,16 @@ export function NavLinks({ className }: { className?: string }) {
   return (
     <nav aria-label="Primary" className={cn("flex items-center gap-8", className)}>
       {NAV_LINKS.map((link) => (
-        <m.div key={link.href} initial="rest" whileHover="hover" animate="rest">
+        <m.div
+          key={link.href}
+          initial="rest"
+          whileHover="hover"
+          animate="rest"
+          className={cn(link.wideOnly && "hidden 2xl:block")}
+        >
           <Link
             href={link.href}
-            className="group relative block py-1 text-[12px] font-medium uppercase tracking-[0.16em]"
+            className="group relative block whitespace-nowrap py-1 text-[12px] font-medium uppercase tracking-[0.16em]"
           >
             {link.label}
             <m.span
