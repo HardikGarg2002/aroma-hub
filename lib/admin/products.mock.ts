@@ -1,6 +1,6 @@
 import { PRODUCT_IMAGES } from "@/lib/images";
 import { COLLECTION_SEED_NAMES, collectionSeedId, peekCollections } from "./collections.mock";
-import type { AdminProduct, AdminProductInput } from "@/types/admin";
+import type { AdminProduct, AdminProductInput, AdminVariant } from "@/types/admin";
 
 /**
  * Mock product store. Pages and actions only use the functions below, so
@@ -31,6 +31,25 @@ const SEEDS: Seed[] = [
   ["AR-SG-012", "Lumen Suede", "Tuscan Leather", "Signature", 148, PRODUCT_IMAGES.lumenSuede.src],
 ];
 
+/** Millilitres in a size label, for scaling the seed price. */
+const ML = (size: string) => Number(size.replace(/[^0-9.]/g, "")) || 50;
+
+/**
+ * Sizes a seed product offers, priced relative to the 50 ml reference so the
+ * sample data actually exercises per-size pricing.
+ */
+function seedVariants(i: number, basePrice: number): AdminVariant[] {
+  const sizes = i % 3 === 0 ? ["10 ml", "50 ml", "100 ml"] : ["30 ml", "50 ml"];
+  return sizes.map((size, j) => ({
+    id: `7a71a27e-0000-4000-8000-${String(i * 10 + j + 1).padStart(12, "0")}`,
+    size,
+    // Smaller bottles cost more per ml, so scale sublinearly rather than pro rata.
+    price: Math.round(basePrice * Math.pow(ML(size) / 50, 0.75) * 100) / 100,
+    stock_quantity: 10 + ((i * 7 + j * 3) % 40),
+    is_active: true,
+  }));
+}
+
 function seed(): AdminProduct[] {
   const base = Date.parse("2026-06-01T10:00:00Z");
   const day = 86_400_000;
@@ -44,9 +63,8 @@ function seed(): AdminProduct[] {
     name,
     inspired_by: inspiredBy,
     description: `${name} — an extrait de parfum from the ${collection} collection.`,
-    price,
     currency: "CAD",
-    size_options: i % 3 === 0 ? ["10 ml", "50 ml", "100 ml"] : ["30 ml", "50 ml"],
+    variants: seedVariants(i, price),
     collection_ids: ids,
     collection_names: ids.length ? [collection] : [],
     image_url: image,
@@ -78,6 +96,7 @@ export async function createProduct(input: AdminProductInput): Promise<AdminProd
   const now = new Date().toISOString();
   const product: AdminProduct = {
     ...input,
+    variants: withIds(input.variants),
     collection_names: namesFor(input.collection_ids),
     id: crypto.randomUUID(),
     created_at: now,
@@ -94,6 +113,7 @@ export async function updateProduct(id: string, input: AdminProductInput): Promi
   list[i] = {
     ...list[i],
     ...input,
+    variants: withIds(input.variants),
     collection_names: namesFor(input.collection_ids),
     updated_at: new Date().toISOString(),
   };
@@ -105,6 +125,13 @@ export async function setProductActive(id: string, isActive: boolean): Promise<A
   if (!product) return null;
   Object.assign(product, { is_active: isActive, updated_at: new Date().toISOString() });
   return product;
+}
+
+/** Give new variants an id and sort cheapest first, as the DB layer does. */
+function withIds(variants: AdminProductInput["variants"]): AdminVariant[] {
+  return variants
+    .map((v) => ({ ...v, id: v.id ?? crypto.randomUUID() }))
+    .sort((a, b) => a.price - b.price);
 }
 
 /** Resolve collection ids to names for display, dropping any that vanished. */

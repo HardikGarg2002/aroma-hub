@@ -57,8 +57,15 @@ export async function buildQuote(
       notices.push("An item in your cart is no longer available and was removed.");
       continue;
     }
-    if (!product.size_options.includes(String(line.size))) {
+    // Price comes from the chosen size's variant, never the product's "from"
+    // price -- otherwise a 100 ml would be charged at the 10 ml price.
+    const variant = product.variants.find((v) => v.size === String(line.size));
+    if (!variant) {
       notices.push(`${product.name} is no longer available in ${line.size}.`);
+      continue;
+    }
+    if (!variant.in_stock) {
+      notices.push(`${product.name} in ${variant.size} is out of stock.`);
       continue;
     }
 
@@ -70,11 +77,12 @@ export async function buildQuote(
     }
     items.push({
       product_id: product.id,
+      variant_id: variant.id,
       product_code: product.product_code,
       name: product.name,
-      size: String(line.size),
+      size: variant.size,
       image_url: product.image_url,
-      unit_price: product.price,
+      unit_price: variant.price,
       quantity: Math.min(MAX_QUANTITY, quantity),
     });
   }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { AdminProduct, AdminProductInput } from "@/types/admin";
+import type { AdminProduct, AdminProductInput, AdminVariant } from "@/types/admin";
 
 /**
  * Supabase-backed product store. Mirrors the function signatures in
@@ -10,6 +10,7 @@ import type { AdminProduct, AdminProductInput } from "@/types/admin";
 
 const TABLE = "products";
 const JOIN = "product_collections";
+const VARIANTS = "product_variants";
 
 /**
  * Single literal, not a concatenation: the SDK statically parses this string.
@@ -17,28 +18,64 @@ const JOIN = "product_collections";
  * in the same round trip, so listing products stays one query.
  */
 const COLUMNS =
-  "id, product_code, name, inspired_by, description, price, currency, size_options, image_url, is_active, created_at, updated_at, product_collections(collections(id, name))" as const;
+  "id, product_code, name, inspired_by, description, currency, image_url, is_active, created_at, updated_at, product_collections(collections(id, name)), product_variants(id, size, price, stock_quantity, is_active)" as const;
 
-/** A row as selected by COLUMNS, before the embed is flattened. */
-type Row = Omit<AdminProduct, "price" | "collection_ids" | "collection_names"> & {
-  price: number | string;
+/** A row as selected by COLUMNS, before the embeds are flattened. */
+type Row = Omit<AdminProduct, "variants" | "collection_ids" | "collection_names"> & {
   product_collections: { collections: { id: string; name: string } | null }[] | null;
+  product_variants: (Omit<AdminVariant, "price"> & { price: number | string })[] | null;
 };
 
 function toProduct(row: Row): AdminProduct {
-  const { product_collections, ...rest } = row;
+  const { product_collections, product_variants, ...rest } = row;
+
   const collections = (product_collections ?? [])
     .map((m) => m.collections)
     .filter((c): c is { id: string; name: string } => c !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Cheapest first, so "from $X" and the list column read naturally.
+  const variants = (product_variants ?? [])
+    .map((v) => ({ ...v, price: Number(v.price) }))
+    .sort((a, b) => a.price - b.price);
+
   return {
     ...rest,
-    price: Number(row.price),
-    size_options: row.size_options ?? [],
+    variants,
     collection_ids: collections.map((c) => c.id),
     collection_names: collections.map((c) => c.name),
   };
+}
+
+/**
+ * Make `variants` exactly the product's sizes. Rows are matched by size, so an
+ * edited price updates in place and a removed size is deleted -- which cascades
+ * nothing, since orders snapshot their line items.
+ */
+async function writeVariants(productId: string, variants: AdminProductInput["variants"]) {
+  const db = supabaseAdmin();
+  const sizes = variants.map((v) => v.size);
+
+  let remove = db.from(VARIANTS).delete().eq("product_id", productId);
+  if (sizes.length) {
+    remove = remove.not("size", "in", `(${sizes.map((s) => `"${s}"`).join(",")})`);
+  }
+  const { error: removeError } = await remove;
+  if (removeError) throw new Error(`Failed to update sizes: ${removeError.message}`);
+
+  if (!sizes.length) return;
+
+  const { error: upsertError } = await db.from(VARIANTS).upsert(
+    variants.map((v) => ({
+      product_id: productId,
+      size: v.size,
+      price: v.price,
+      stock_quantity: v.stock_quantity,
+      is_active: v.is_active,
+    })),
+    { onConflict: "product_id,size" },
+  );
+  if (upsertError) throw new Error(`Failed to update sizes: ${upsertError.message}`);
 }
 
 export async function listProducts(): Promise<AdminProduct[]> {
@@ -110,7 +147,7 @@ async function syncMemberships(
 }
 
 export async function createProduct(input: AdminProductInput): Promise<AdminProduct> {
-  const { collection_ids, ...columns } = input;
+  const { collection_ids, variants, ...columns } = input;
 
   const { data, error } = await supabaseAdmin()
     .from(TABLE)
@@ -120,6 +157,7 @@ export async function createProduct(input: AdminProductInput): Promise<AdminProd
 
   if (error) throw new Error(`Failed to create product: ${error.message}`);
 
+  await writeVariants(data.id, variants);
   await syncMemberships(
     { column: "product_id", value: data.id },
     "collection_id",
@@ -136,7 +174,7 @@ export async function updateProduct(
   id: string,
   input: AdminProductInput,
 ): Promise<AdminProduct | null> {
-  const { collection_ids, ...columns } = input;
+  const { collection_ids, variants, ...columns } = input;
 
   const { data, error } = await supabaseAdmin()
     .from(TABLE)
@@ -148,6 +186,7 @@ export async function updateProduct(
   if (error) throw new Error(`Failed to update product: ${error.message}`);
   if (!data) return null;
 
+  await writeVariants(id, variants);
   await syncMemberships(
     { column: "product_id", value: id },
     "collection_id",

@@ -4,15 +4,18 @@ import { useState } from "react";
 import { cartKey, useCartStore } from "@/lib/cart/store";
 import { cn } from "@/lib/cn";
 import { QuantityStepper } from "./QuantityStepper";
+import type { ShopVariant } from "@/lib/catalog";
 
 /** The fields a product card needs to hand to the cart. */
 export interface CartProductInput {
   id: string;
   name: string;
   image_url: string | null;
+  /** Lowest active price; the chosen size's variant is what actually bills. */
   price: number;
   currency: string;
   size_options: string[];
+  variants: ShopVariant[];
 }
 
 /**
@@ -43,12 +46,15 @@ export function CartControl({
   if (!size) return null; // Nothing purchasable without a size.
 
   const add = () => {
+    // Price the size the shopper chose, not the product's "from" price.
+    const chosen = product.variants.find((v) => v.size === size);
+    if (!chosen) return;
     addItem({
       product_id: product.id,
       name: product.name,
       size,
       image_url: product.image_url,
-      unit_price: product.price,
+      unit_price: chosen.price,
       currency: product.currency,
     });
     open();

@@ -7,6 +7,7 @@ import { toggleProductActive } from "@/lib/admin/product-actions";
 import { requireAdmin } from "@/lib/admin/auth";
 import { listProducts } from "@/lib/admin/products";
 import { formatDateTime, formatMoney } from "@/lib/admin/format";
+import { fromPrice } from "@/types/admin";
 
 export const metadata: Metadata = { title: "Products" };
 
@@ -65,8 +66,18 @@ export default async function AdminProductsPage() {
                 <td className="px-4 py-3 text-ink-soft">
                   {p.collection_names.length ? p.collection_names.join(", ") : "—"}
                 </td>
-                <td className="px-4 py-3 text-ink-soft">{p.size_options.join(", ")}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{formatMoney(p.price, p.currency)}</td>
+                <td className="px-4 py-3 text-ink-soft">
+                  {p.variants.map((v) => v.size).join(", ") || "—"}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {(() => {
+                    const from = fromPrice(p);
+                    if (from === null) return "—";
+                    // Several sizes means several prices; show the entry point.
+                    const prefix = p.variants.filter((v) => v.is_active).length > 1 ? "from " : "";
+                    return `${prefix}${formatMoney(from, p.currency)}`;
+                  })()}
+                </td>
                 <td className="px-4 py-3">
                   <StatusToggle
                     id={p.id}

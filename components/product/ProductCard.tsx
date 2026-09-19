@@ -164,6 +164,11 @@ export function ProductCard({
             price: product.price,
             currency: "CAD",
             size_options: [product.size],
+            // The static catalogue has one size at one price, so it maps to a
+            // single variant. Its id is only used to match the chosen size.
+            variants: [
+              { id: product.id, size: product.size, price: product.price, in_stock: true },
+            ],
           }}
         />
       </div>

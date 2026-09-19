@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { saveCollection, type CollectionFormValues } from "@/lib/admin/collection-actions";
-import type { AdminCollection, AdminProduct } from "@/types/admin";
+import { fromPrice, type AdminCollection, type AdminProduct } from "@/types/admin";
 import { formatMoney } from "@/lib/admin/format";
 import { cn } from "@/lib/cn";
 import { ProductThumb } from "./ProductThumb";
@@ -236,7 +236,7 @@ function ProductMembers({
                 {p.name}
               </Link>
               <p className="truncate text-xs text-muted">
-                <span className="font-mono">{p.product_code}</span> · {formatMoney(p.price, p.currency)}
+                <span className="font-mono">{p.product_code}</span> · {(() => { const f = fromPrice(p); return f === null ? "—" : formatMoney(f, p.currency); })()}
                 {!p.is_active && " · Inactive"}
               </p>
             </div>

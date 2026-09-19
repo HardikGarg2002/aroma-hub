@@ -1,3 +1,18 @@
+/**
+ * One purchasable size of a product. Price and stock live here, not on the
+ * product: a 10 ml and a 100 ml of the same scent are priced separately.
+ */
+export interface AdminVariant {
+  id: string;
+  size: string;
+  price: number;
+  stock_quantity: number;
+  is_active: boolean;
+}
+
+/** A variant as submitted by the product form; id is absent when adding. */
+export type AdminVariantInput = Omit<AdminVariant, "id"> & { id?: string };
+
 /** Catalogue product as stored in the admin/DB layer (snake_case mirrors the table). */
 export interface AdminProduct {
   id: string;
@@ -5,9 +20,9 @@ export interface AdminProduct {
   name: string;
   inspired_by: string | null;
   description: string | null;
-  price: number;
   currency: string;
-  size_options: string[];
+  /** Purchasable sizes, cheapest first. A product needs at least one. */
+  variants: AdminVariant[];
   /**
    * Collections this product belongs to, via the product_collections join
    * table. A product can be in several at once (e.g. "Amber" and
@@ -26,12 +41,19 @@ export interface AdminProduct {
 
 /**
  * Fields an admin can edit; id and timestamps are server-managed, and
- * collection_names is derived from collection_ids on read.
+ * collection_names is derived from collection_ids on read. Variants are
+ * written through as a set -- see setVariants() in the product store.
  */
 export type AdminProductInput = Omit<
   AdminProduct,
-  "id" | "created_at" | "updated_at" | "collection_names"
->;
+  "id" | "created_at" | "updated_at" | "collection_names" | "variants"
+> & { variants: AdminVariantInput[] };
+
+/** Lowest active price across a product's variants, for list/card display. */
+export function fromPrice(product: Pick<AdminProduct, "variants">): number | null {
+  const prices = product.variants.filter((v) => v.is_active).map((v) => v.price);
+  return prices.length ? Math.min(...prices) : null;
+}
 
 /**
  * Product collection. Membership lives in the product_collections join table,
@@ -60,6 +82,8 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 export interface AdminOrderItem {
   product_id: string;
+  /** Which size was bought. Null for orders placed before variants existed. */
+  variant_id: string | null;
   /** Snapshotted at checkout, so later product edits don't rewrite history. */
   product_code: string;
   name: string;

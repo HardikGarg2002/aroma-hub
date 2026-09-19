@@ -84,13 +84,19 @@ async function seed(): Promise<AdminOrder[]> {
     for (let j = 0; j < lineCount; j++) {
       const p = pickProduct();
       if (items.some((it) => it.product_id === p.id)) continue;
+      if (p.variants.length === 0) continue;
+
+      // Price comes from the chosen size, not the product: that pairing is the
+      // whole reason variants exist.
+      const variant = p.variants[Math.floor(rand() * p.variants.length)];
       items.push({
         product_id: p.id,
+        variant_id: variant.id,
         product_code: p.product_code,
         name: p.name,
-        size: p.size_options[Math.floor(rand() * p.size_options.length)] ?? "50ml",
+        size: variant.size,
         image_url: p.image_url,
-        unit_price: p.price,
+        unit_price: variant.price,
         quantity: rand() < 0.75 ? 1 : 2,
       });
     }

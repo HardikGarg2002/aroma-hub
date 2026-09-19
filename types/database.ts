@@ -4,6 +4,7 @@ import type {
   AdminOrder,
   AdminOrderItem,
   AdminProduct,
+  AdminVariant,
   OrderStatus,
   PaymentStatus,
 } from "./admin";
@@ -25,11 +26,16 @@ type Generated = "id" | "created_at" | "updated_at";
 
 type NumericRead<T, K extends keyof T> = Omit<T, K> & { [P in K]: number | string };
 
-/** The `collection` text column is gone; membership lives in product_collections. */
-type ProductRow = NumericRead<
-  Omit<AdminProduct, "collection_ids" | "collection_names">,
-  "price"
+/**
+ * `collection` moved to product_collections; `price`/`size_options` moved to
+ * product_variants. What remains on the row is true of the scent itself.
+ */
+type ProductRow = Omit<
+  AdminProduct,
+  "collection_ids" | "collection_names" | "variants"
 >;
+
+type ProductVariantRow = NumericRead<AdminVariant & { product_id: string }, "price">;
 
 interface ProductCollectionRow {
   product_id: string;
@@ -56,9 +62,10 @@ interface Table<Row extends Record<string, unknown>, Insert> {
 export interface Database {
   public: {
     Tables: {
-      products: Table<
-        ProductRow & Record<string, unknown>,
-        Omit<AdminProduct, Generated | "collection_ids" | "collection_names">
+      products: Table<ProductRow & Record<string, unknown>, Omit<ProductRow, Generated>>;
+      product_variants: Table<
+        ProductVariantRow & Record<string, unknown>,
+        Omit<AdminVariant, "id"> & { product_id: string }
       >;
       product_collections: Table<
         ProductCollectionRow & Record<string, unknown>,

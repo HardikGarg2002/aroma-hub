@@ -2,7 +2,7 @@ import "server-only";
 
 import { listCollections } from "@/lib/admin/collections";
 import { listProducts } from "@/lib/admin/products";
-import type { CollectionRef, ShopProduct } from "@/lib/catalog";
+import { toShopVariants, type CollectionRef, type ShopProduct } from "@/lib/catalog";
 
 /**
  * Storefront search over active products and collections. The catalogue is
@@ -73,15 +73,17 @@ export async function searchCatalog(rawQuery: string): Promise<SearchResults> {
     if (fields.name === q) score += 50;
     else if (fields.name.startsWith(q)) score += 20;
 
+    const variants = toShopVariants(p);
     scored.push({
       score,
       product: {
         id: p.id,
         name: p.name,
         inspired_by: p.inspired_by,
-        price: p.price,
+        price: variants[0]?.price ?? 0,
         currency: p.currency,
-        size_options: p.size_options,
+        variants,
+        size_options: variants.map((v) => v.size),
         image_url: p.image_url,
         collections: refs,
       },

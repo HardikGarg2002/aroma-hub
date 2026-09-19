@@ -44,12 +44,24 @@ export interface CollectionRef {
   slug: string;
 }
 
+/** A purchasable size as the storefront needs it. */
+export interface ShopVariant {
+  id: string;
+  size: string;
+  price: number;
+  /** Out-of-stock sizes still render, but can't be added to the cart. */
+  in_stock: boolean;
+}
+
 export interface ShopProduct {
   id: string;
   name: string;
   inspired_by: string | null;
+  /** Lowest active price -- an entry point, not what any given size costs. */
   price: number;
   currency: string;
+  /** Active sizes, cheapest first. Price comes from the chosen one. */
+  variants: ShopVariant[];
   size_options: string[];
   image_url: string | null;
   /** Active collections only. */
@@ -69,16 +81,26 @@ async function activeCollectionMap() {
 }
 
 function toShopProduct(p: AdminProduct, live: Map<string, CollectionRef>): ShopProduct {
+  const variants = toShopVariants(p);
   return {
     id: p.id,
     name: p.name,
     inspired_by: p.inspired_by,
-    price: p.price,
+    price: variants[0]?.price ?? 0,
     currency: p.currency,
-    size_options: p.size_options,
+    variants,
+    size_options: variants.map((v) => v.size),
     image_url: p.image_url,
     collections: p.collection_ids.flatMap((id) => live.get(id) ?? []),
   };
+}
+
+/** Active sizes only, cheapest first -- shoppers can't buy a disabled size. */
+export function toShopVariants(p: AdminProduct): ShopVariant[] {
+  return p.variants
+    .filter((v) => v.is_active)
+    .map((v) => ({ id: v.id, size: v.size, price: v.price, in_stock: v.stock_quantity > 0 }))
+    .sort((a, b) => a.price - b.price);
 }
 
 /** Every active product, newest first. */

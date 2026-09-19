@@ -24,12 +24,15 @@ export function ProductPurchase({ product }: { product: CartProductInput }) {
   }
 
   const add = () => {
+    // Price the size the shopper chose, not the product's "from" price.
+    const chosen = product.variants.find((v) => v.size === size);
+    if (!chosen) return;
     addItem({
       product_id: product.id,
       name: product.name,
       size,
       image_url: product.image_url,
-      unit_price: product.price,
+      unit_price: chosen.price,
       currency: product.currency,
     });
     open();

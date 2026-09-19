@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { saveProduct, type ProductFormValues } from "@/lib/admin/product-actions";
+import { saveProduct, type ProductFormValues, type VariantFormValues } from "@/lib/admin/product-actions";
 import type { AdminProduct } from "@/types/admin";
 import { cn } from "@/lib/cn";
 import { ProductThumb } from "./ProductThumb";
@@ -22,9 +22,16 @@ function toValues(p: AdminProduct | null): ProductFormValues {
     name: p?.name ?? "",
     inspired_by: p?.inspired_by ?? "",
     description: p?.description ?? "",
-    price: p ? String(p.price) : "",
     currency: p?.currency ?? "CAD",
-    size_options: p?.size_options ?? ["50 ml"],
+    variants: p
+      ? p.variants.map((v) => ({
+          id: v.id,
+          size: v.size,
+          price: String(v.price),
+          stock_quantity: String(v.stock_quantity),
+          is_active: v.is_active,
+        }))
+      : [{ size: "50 ml", price: "", stock_quantity: "0", is_active: true }],
     collection_ids: p?.collection_ids ?? [],
     image_url: p?.image_url ?? "",
     is_active: String(p?.is_active ?? true),
@@ -39,7 +46,13 @@ export function ProductForm({ product, currencies, collections, sizePresets }: P
   const errors = state?.errors ?? {};
 
   const [imageUrl, setImageUrl] = useState(values.image_url);
-  const [sizes, setSizes] = useState<string[]>(values.size_options);
+  const [variants, setVariants] = useState<VariantFormValues[]>(values.variants);
+
+  const setVariant = (i: number, patch: Partial<VariantFormValues>) =>
+    setVariants((rows) => rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const addVariant = () =>
+    setVariants((rows) => [...rows, { size: "", price: "", stock_quantity: "0", is_active: true }]);
+  const removeVariant = (i: number) => setVariants((rows) => rows.filter((_, j) => j !== i));
   const [collectionIds, setCollectionIds] = useState<string[]>(values.collection_ids);
 
   const toggleCollection = (id: string) =>
@@ -74,32 +87,103 @@ export function ProductForm({ product, currencies, collections, sizePresets }: P
           </Field>
         </Section>
 
-        <Section title="Pricing & sizes">
-          <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
-            <Field label="Price" error={errors.price}>
-              <input
-                name="price"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                defaultValue={values.price}
-                className={cn(input(errors.price), "tabular-nums")}
-              />
-            </Field>
-            <Field label="Currency" error={errors.currency}>
-              <select name="currency" defaultValue={values.currency} className={input(errors.currency)}>
-                {currencies.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          <Field label="Size options" error={errors.size_options} as="div">
-            <SizeOptions presets={sizePresets} value={sizes} onChange={setSizes} />
-            {sizes.map((s) => (
-              <input key={s} type="hidden" name="size_options" value={s} />
-            ))}
+        <Section title="Sizes & pricing">
+          <Field label="Currency" error={errors.currency}>
+            <select name="currency" defaultValue={values.currency} className={input(errors.currency)}>
+              {currencies.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Sizes" error={errors.variants} hint="Each size has its own price" as="div">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead className="text-left text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <th className="pb-2 font-medium">Size</th>
+                    <th className="pb-2 font-medium">Price</th>
+                    <th className="pb-2 font-medium">Stock</th>
+                    <th className="pb-2 text-center font-medium">Active</th>
+                    <th className="pb-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {variants.map((v, i) => (
+                    <tr key={i} className="border-t border-line">
+                      <td className="py-2 pr-2">
+                        {v.id && <input type="hidden" name="variant_id" value={v.id} />}
+                        {!v.id && <input type="hidden" name="variant_id" value="" />}
+                        <input
+                          name="variant_size"
+                          list={`sizes-${i}`}
+                          value={v.size}
+                          onChange={(e) => setVariant(i, { size: e.target.value })}
+                          placeholder="50 ml"
+                          className={input()}
+                        />
+                        <datalist id={`sizes-${i}`}>
+                          {sizePresets.map((s) => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input
+                          name="variant_price"
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step="0.01"
+                          value={v.price}
+                          onChange={(e) => setVariant(i, { price: e.target.value })}
+                          className={cn(input(), "tabular-nums")}
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input
+                          name="variant_stock"
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          step="1"
+                          value={v.stock_quantity}
+                          onChange={(e) => setVariant(i, { stock_quantity: e.target.value })}
+                          className={cn(input(), "tabular-nums")}
+                        />
+                      </td>
+                      <td className="py-2 text-center">
+                        <input
+                          type="checkbox"
+                          name="variant_active"
+                          value={String(i)}
+                          checked={v.is_active}
+                          onChange={(e) => setVariant(i, { is_active: e.target.checked })}
+                          className="size-4 accent-ink"
+                        />
+                      </td>
+                      <td className="py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => removeVariant(i)}
+                          disabled={variants.length === 1}
+                          className="text-xs text-muted hover:text-ink disabled:opacity-40"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button
+              type="button"
+              onClick={addVariant}
+              className="mt-3 text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+            >
+              + Add size
+            </button>
           </Field>
         </Section>
       </div>
@@ -184,70 +268,5 @@ export function ProductForm({ product, currencies, collections, sizePresets }: P
         </button>
       </div>
     </form>
-  );
-}
-
-function SizeOptions({
-  presets,
-  value,
-  onChange,
-}: {
-  presets: readonly string[];
-  value: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const [custom, setCustom] = useState("");
-  const all = [...presets, ...value.filter((v) => !presets.includes(v))];
-  const toggle = (s: string) => onChange(value.includes(s) ? value.filter((v) => v !== s) : [...value, s]);
-
-  const addCustom = () => {
-    const s = custom.trim();
-    if (s && !value.includes(s)) onChange([...value, s]);
-    setCustom("");
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        {all.map((s) => {
-          const on = value.includes(s);
-          return (
-            <button
-              key={s}
-              type="button"
-              onClick={() => toggle(s)}
-              aria-pressed={on}
-              className={cn(
-                "rounded-full border px-3 py-1 text-sm transition-colors",
-                on ? "border-ink bg-ink text-bone" : "border-line text-ink-soft hover:border-ink",
-              )}
-            >
-              {s}
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex gap-2">
-        <input
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addCustom();
-            }
-          }}
-          placeholder="Custom size, e.g. 75 ml"
-          className={cn(input(), "mt-0 max-w-56")}
-        />
-        <button
-          type="button"
-          onClick={addCustom}
-          className="rounded-md border border-line px-3 text-sm hover:border-ink"
-        >
-          Add
-        </button>
-      </div>
-    </div>
   );
 }
