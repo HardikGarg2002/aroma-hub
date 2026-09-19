@@ -1,15 +1,18 @@
+import { usingSupabase } from "./data-source";
 import * as mock from "./coupons.mock";
+import * as db from "./coupons.supabase";
 
 /**
- * Coupon store. Mock-only for now; when a Supabase table exists, add
- * coupons.supabase.ts with the same exports and pick between them on
- * `usingSupabase`, as products.ts and collections.ts do.
+ * Coupon store. Delegates to Supabase or to the in-memory sample data
+ * depending on ADMIN_DATA_SOURCE -- see lib/admin/data-source.ts.
  */
 
-export const listCoupons = mock.listCoupons;
-export const getCoupon = mock.getCoupon;
-export const getCouponByCode = mock.getCouponByCode;
-export const isCouponCodeTaken = mock.isCouponCodeTaken;
-export const createCoupon = mock.createCoupon;
-export const updateCoupon = mock.updateCoupon;
-export const setCouponActive = mock.setCouponActive;
+const impl = usingSupabase ? db : mock;
+
+export const listCoupons = impl.listCoupons;
+export const getCoupon = impl.getCoupon;
+export const getCouponByCode = impl.getCouponByCode;
+export const isCouponCodeTaken = impl.isCouponCodeTaken;
+export const createCoupon = impl.createCoupon;
+export const updateCoupon = impl.updateCoupon;
+export const setCouponActive = impl.setCouponActive;

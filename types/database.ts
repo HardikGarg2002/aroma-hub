@@ -1,6 +1,7 @@
 import type {
   AdminAddress,
   AdminCollection,
+  AdminCoupon,
   AdminOrder,
   AdminOrderItem,
   AdminProduct,
@@ -42,6 +43,8 @@ interface ProductCollectionRow {
   collection_id: string;
   created_at: string;
 }
+
+type CouponRow = NumericRead<AdminCoupon, "discount_amount" | "min_cart_value">;
 type OrderRow = NumericRead<
   Omit<AdminOrder, "items" | "shipping_address" | "status" | "payment_status">,
   "subtotal" | "shipping" | "tax" | "discount" | "total"
@@ -75,6 +78,7 @@ export interface Database {
         AdminCollection & Record<string, unknown>,
         Omit<AdminCollection, Generated>
       >;
+      coupons: Table<CouponRow & Record<string, unknown>, Omit<CouponRow, Generated>>;
       // order_number has a database default (see 0004_checkout.sql).
       orders: Table<
         OrderRow & Record<string, unknown>,

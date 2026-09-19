@@ -22,8 +22,8 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Data: Supabase or sample data
 
-Admin data (products, collections, orders) comes from either Supabase or the
-in-memory sample stores. `ADMIN_DATA_SOURCE` picks:
+Admin data (products, collections, coupons, orders) comes from either
+Supabase or the in-memory sample stores. `ADMIN_DATA_SOURCE` picks:
 
 | value      | source                                                        |
 | ---------- | ------------------------------------------------------------- |
@@ -32,23 +32,26 @@ in-memory sample stores. `ADMIN_DATA_SOURCE` picks:
 | unset      | `supabase` if `SUPABASE_SECRET_KEY` is set, else `mock`         |
 
 Pages and server actions always import from `lib/admin/products.ts`,
-`collections.ts` and `orders.ts`; those modules re-export whichever
-implementation is selected, so nothing else in the app changes with the mode.
+`collections.ts`, `coupons.ts` and `orders.ts`; those modules re-export
+whichever implementation is selected, so nothing else in the app changes with
+the mode.
 
 ### First-time Supabase setup
 
 1. Copy `.env.example` to `.env.local` and fill in the values. The secret key
    is in the Supabase dashboard under **Project Settings > API Keys**; it
    bypasses RLS, so keep it out of the browser and out of git.
-2. Run `supabase/migrations/0001_collections_and_orders.sql` in the Supabase
-   SQL editor. It creates `collections` and `orders`; the pre-existing
-   `products` table is left untouched. Safe to re-run.
+2. Run the migrations in `supabase/migrations/` in order, in the Supabase SQL
+   editor. `0001_collections_and_orders.sql` creates `collections` and
+   `orders` (the pre-existing `products` table is left untouched);
+   `0005_coupons.sql` creates `coupons`. All are safe to re-run.
 3. Start the app. To go back to sample data at any point, set
    `ADMIN_DATA_SOURCE=mock`.
 
-RLS is enabled on `collections` and `orders`. The publishable key can read
-active collections only; orders are readable exclusively through the
-service-role key, since they hold customer names, emails and addresses. Check
+RLS is enabled on `collections`, `coupons` and `orders`. The publishable key
+can read active collections only; coupons and orders are readable exclusively
+through the service-role key — coupons so codes can't be enumerated from the
+browser, orders because they hold customer names, emails and addresses. Check
 that `products` has RLS enabled too, with a read policy for active rows.
 
 
